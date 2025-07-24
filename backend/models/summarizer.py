@@ -71,7 +71,7 @@ def summarize_reviews(labeled_csv: str):
                 truncation=True
             )
             summary_chunks.append(result[0]["summary_text"])
-        combined_summary = " ".join(summaries)
+        combined_summary = " ".join(summary_chunks)
         print(f"\n=== {label} Reviews Summary ===\n{combined_summary}\n")
 
     summarize_category(1, "Positive")

@@ -21,7 +21,7 @@ def map_label(label_str: str) -> int:
 
 def main():
     # Load scraped reviews
-    df = pd.read_csv("./training/dataset/test2.csv")  # expects a column "review"
+    df = pd.read_csv("./models/dataset/test2.csv")  # expects a column "review"
     
     # Load pretrained RoBERTa classifier
     model_name = "cardiffnlp/twitter-roberta-base-sentiment"
@@ -48,7 +48,7 @@ def main():
     
     # Save labeled reviews
     df["sentiment"] = labels
-    df.to_csv("./training/dataset/test.csv", index=False)
+    df.to_csv("./models/dataset/test.csv", index=False)
     print(f"Saved reviews_labeled.csv with sentiment labels on {DEVICE}.")
 
 if __name__ == "__main__":
