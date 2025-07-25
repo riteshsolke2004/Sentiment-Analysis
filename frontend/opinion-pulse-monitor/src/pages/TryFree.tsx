@@ -1,65 +1,93 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, TrendingUp, TrendingDown, Minus, Upload, FileText } from 'lucide-react';
+import { MessageSquare, TrendingUp, TrendingDown, Minus, Link2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import axios from 'axios';
 
+// Define a type for the analysis result for better type-checking
+interface AnalysisResult {
+  sentiment: 'Positive' | 'Negative' | 'Neutral';
+  score: number;
+  confidence: number;
+  keywords: string[];
+}
+
+// Define a type for a single scraped review
+interface ScrapedReview {
+  review_text: string;
+  // Add other fields like rating, title, etc., if you need them
+}
+
 const TryFreePage = () => {
   const [text, setText] = useState('');
-  const [analysis, setAnalysis] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type === 'text/plain') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target.result;
-        if (typeof result === 'string') {
-          setText(result);
-          setUploadedFile(file);
-        }
-      };
-      reader.readAsText(file);
-    } else {
-      alert('Please upload a text file (.txt)');
-    }
-  };
+  const [url, setUrl] = useState('');
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   const analyzeSentiment = async () => {
-    if (!text.trim()) return;
-    setIsAnalyzing(true);
+    if (!url.trim() && !text.trim()) return;
+
+    setIsLoading(true);
     setAnalysis(null);
 
+    let textToAnalyze = text;
+
     try {
-      // Step 1: Analyze the sentiment using FastAPI
-      const res = await axios.post('http://127.0.0.1:8000/analyze', { text });
-      const result = res.data;
+      // --- STEP 1: Scrape reviews if a URL is provided ---
+      if (url.trim()) {
+        setLoadingMessage('Scraping Reviews...');
+        console.log('Scraping URL:', url);
+
+        // Call your new scraping endpoint
+        const scrapeRes = await axios.post<{ reviews: ScrapedReview[] }>('http://127.0.0.1:8000/scrape', { url });
+        
+        // Combine all review texts into a single block of text
+        const scrapedText = scrapeRes.data.reviews
+          .map(review => review.review_text)
+          .filter(Boolean) // Filter out any null or empty reviews
+          .join('\n\n---\n\n');
+
+        if (!scrapedText) {
+          throw new Error("Could not extract any review text from the URL.");
+        }
+
+        setText(scrapedText); // Update the text area with scraped content
+        textToAnalyze = scrapedText;
+      }
+
+      // --- STEP 2: Analyze the sentiment of the text ---
+      setLoadingMessage('Analyzing Sentiment...');
+      console.log('Analyzing text...');
+      
+      const analysisRes = await axios.post('http://127.0.0.1:8000/analyze', { text: textToAnalyze });
+      const result = analysisRes.data;
       setAnalysis(result);
 
-      // Step 2: Save the result in MongoDB
+      // --- STEP 3: Save the result in MongoDB ---
       await axios.post("http://127.0.0.1:8000/api/submit-review", {
-        text: text,
+        text: textToAnalyze,
         sentiment: result.sentiment,
         score: result.score,
         confidence: result.confidence
       });
-    } catch (error) {
-      console.error('Error connecting to FastAPI:', error);
-      alert("Failed to analyze or save. Please check if your backend is running.");
-    }
 
-    setIsAnalyzing(false);
+    } catch (error) {
+      console.error('An error occurred:', error);
+      alert("Failed to process the request. Please check if your backend is running and the URL is correct.");
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
   };
 
-  const getSentimentIcon = (sentiment) => {
+  const getSentimentIcon = (sentiment: AnalysisResult['sentiment']) => {
     switch (sentiment) {
       case 'Positive':
         return <TrendingUp className="w-5 h-5 text-green-500" />;
@@ -70,7 +98,7 @@ const TryFreePage = () => {
     }
   };
 
-  const getSentimentColor = (sentiment) => {
+  const getSentimentColor = (sentiment: AnalysisResult['sentiment']) => {
     switch (sentiment) {
       case 'Positive':
         return 'bg-green-500';
@@ -98,45 +126,34 @@ const TryFreePage = () => {
               </h1>
             </div>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Test our AI-powered sentiment analysis with your own text. Enter any customer review, feedback, or comment below, or upload a text file.
+              Test our AI-powered sentiment analysis. Enter any customer review, feedback, or paste a Flipkart product URL to scrape and analyze reviews.
             </p>
           </div>
 
           {/* Analysis Form */}
           <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm mb-8">
             <CardHeader>
-              <CardTitle>Enter Text for Analysis</CardTitle>
+              <CardTitle>Enter Content for Analysis</CardTitle>
               <CardDescription>
-                Paste any customer review, feedback, or text you'd like to analyze, or upload a text file
+                Paste a Flipkart URL to scrape reviews, or enter text directly.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* File Upload Section */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
-                <input
-                  type="file"
-                  accept=".txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Upload className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-medium text-gray-700">Upload a text file</p>
-                      <p className="text-sm text-gray-500">Click to browse or drag and drop (.txt files only)</p>
-                    </div>
-                  </div>
-                </label>
-                {uploadedFile && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-green-600">
-                    <FileText className="w-4 h-4" />
-                    <span className="text-sm font-medium">{uploadedFile.name} uploaded</span>
-                  </div>
-                )}
+              {/* URL Input Section */}
+              <div>
+                <label htmlFor="url-input" className="text-sm font-medium text-gray-700">Analyze from URL</label>
+                <div className="relative mt-1">
+                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="url-input"
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://www.flipkart.com/your-product/p/..."
+                    className="pl-10"
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
 
               <div className="text-center text-gray-500 font-medium">OR</div>
@@ -147,17 +164,18 @@ const TryFreePage = () => {
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Example: This product is amazing! The quality exceeded my expectations and the customer service was fantastic."
                 className="min-h-32 resize-none"
+                disabled={isLoading}
               />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">
-                  {text.length}/1000 characters
+                  {text.length} characters
                 </span>
                 <Button
                   onClick={analyzeSentiment}
-                  disabled={!text.trim() || isAnalyzing}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={(!text.trim() && !url.trim()) || isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 w-48"
                 >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze Sentiment'}
+                  {isLoading ? loadingMessage : 'Analyze Sentiment'}
                 </Button>
               </div>
             </CardContent>
