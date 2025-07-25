@@ -56,10 +56,11 @@ def summarize_reviews(labeled_csv='reviews_labeled.csv'):
             )
             summary_chunks.append(result[0]["summary_text"])
         combined_summary = " ".join(summary_chunks)
-        print(f"\n=== {label} Reviews Summary ===\n{combined_summary}\n")
+        return combined_summary
 
-    summarize_category(1, "Positive")
-    summarize_category(-1, "Negative")
+    positive_summary = summarize_category(1, "Positive")
+    negative_summary = summarize_category(-1, "Negative")
+    return positive_summary, negative_summary
 # === END INTEGRATION ===
 
 if __name__ == "__main__":
