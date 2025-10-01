@@ -32,7 +32,7 @@ Make sure you have installed:
 ### Installation
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/SentimentAnalysisDashboard.git
+   git clone https://github.com/riteshsolke2004/Sentiment-Analysis.git
    cd SentimentAnalysisDashboard
 2. **Backend Setup**
 ```bash
